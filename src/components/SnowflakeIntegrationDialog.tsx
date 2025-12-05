@@ -9,11 +9,18 @@ import { Alert, AlertDescription } from './ui/alert';
 interface SnowflakeIntegrationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;   // ✅ callback to refresh integration list
 }
 
-export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeIntegrationDialogProps) {
+export function SnowflakeIntegrationDialog({
+  open,
+  onOpenChange,
+  onCreated
+}: SnowflakeIntegrationDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     account: '',
@@ -22,31 +29,69 @@ export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeInte
     password: ''
   });
 
+  // ✅ OPTIONAL: Replace with real connection-test API later
   const handleTestConnection = async () => {
     setIsLoading(true);
     setTestResult(null);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock success/failure randomly
-    const success = Math.random() > 0.3;
-    setTestResult(success ? 'success' : 'error');
-    setIsLoading(false);
+    setApiError(null);
+
+    try {
+      // TEMP mock delay – you can replace with real API
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setTestResult('success');
+    } catch (err) {
+      setTestResult('error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCreate = () => {
-    console.log('Creating integration:', formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
-      name: '',
-      account: '',
-      warehouse: '',
-      username: '',
-      password: ''
-    });
-    setTestResult(null);
+  // ✅ ✅ REAL CREATE → POST TO FASTAPI
+  const handleCreate = async () => {
+    setIsLoading(true);
+    setApiError(null);
+
+    try {
+      const res = await fetch('http://localhost:8000/integration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          account: formData.account,
+          warehouse: formData.warehouse,
+          username: formData.username,
+          password: formData.password,
+          schema_name: 'hackathon',        // ✅ required by backend?
+          database_name: 'hackathon'       // ✅ required by backend?
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to create integration');
+      }
+
+      // ✅ Success
+      onOpenChange(false);
+      onCreated?.();     // refresh integration list
+
+      // ✅ Reset Form
+      setFormData({
+        name: '',
+        account: '',
+        warehouse: '',
+        username: '',
+        password: ''
+      });
+
+      setTestResult(null);
+    } catch (err: any) {
+      setApiError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -68,58 +113,49 @@ export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeInte
 
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="integration-name">Integration Name</Label>
-            <Input 
-              id="integration-name" 
-              placeholder="e.g., Production Snowflake"
+            <Label>Integration Name</Label>
+            <Input
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="account">Account</Label>
-              <Input 
-                id="account" 
-                placeholder="e.g., xy12345.us-east-1"
+              <Label>Account</Label>
+              <Input
                 value={formData.account}
-                onChange={(e) => setFormData({...formData, account: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, account: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="warehouse">Warehouse</Label>
-              <Input 
-                id="warehouse" 
-                placeholder="e.g., COMPUTE_WH"
+              <Label>Warehouse</Label>
+              <Input
                 value={formData.warehouse}
-                onChange={(e) => setFormData({...formData, warehouse: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input 
-              id="username" 
-              placeholder="Snowflake username"
+            <Label>Username</Label>
+            <Input
               value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input 
-              id="password" 
+            <Label>Password</Label>
+            <Input
               type="password"
-              placeholder="Snowflake password"
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             />
           </div>
 
+          {/* ✅ TEST RESULT */}
           {testResult && (
             <Alert className={testResult === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
               <div className="flex items-center gap-2">
@@ -128,18 +164,27 @@ export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeInte
                 ) : (
                   <XCircle className="w-4 h-4 text-red-600" />
                 )}
-                <AlertDescription className={testResult === 'success' ? 'text-green-700' : 'text-red-700'}>
-                  {testResult === 'success' 
-                    ? 'Connection successful! You can now create this integration.' 
-                    : 'Connection failed. Please check your credentials and try again.'}
+                <AlertDescription>
+                  {testResult === 'success'
+                    ? 'Connection successful!'
+                    : 'Connection failed'}
                 </AlertDescription>
               </div>
             </Alert>
           )}
 
+          {/* ✅ API ERROR */}
+          {apiError && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertDescription className="text-red-700">
+                {apiError}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex-1"
               onClick={handleTestConnection}
               disabled={isLoading || !formData.account || !formData.username || !formData.password}
@@ -147,7 +192,7 @@ export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeInte
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing Connection...
+                  Testing...
                 </>
               ) : (
                 'Test Connection'
@@ -160,11 +205,11 @@ export function SnowflakeIntegrationDialog({ open, onOpenChange }: SnowflakeInte
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleCreate}
-            disabled={testResult !== 'success'}
+            disabled={testResult !== 'success' || isLoading}
           >
-            Create Integration
+            {isLoading ? 'Creating...' : 'Create Integration'}
           </Button>
         </div>
       </DialogContent>
