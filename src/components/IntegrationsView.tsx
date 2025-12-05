@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,42 +7,39 @@ import { IntegrationDetailDialog } from './IntegrationDetailDialog';
 import { IntegrationTypeSelector } from './IntegrationTypeSelector';
 import type { Integration } from '../App';
 
-const mockIntegrations: Integration[] = [
-  {
-    id: '1',
-    name: 'Production Snowflake',
-    type: 'snowflake',
-    status: 'connected',
-    lastSync: '5 minutes ago',
-    recordsSynced: 1250000,
-    icon: '❄️'
-  },
-  {
-    id: '2',
-    name: 'Analytics Snowflake',
-    type: 'snowflake',
-    status: 'connected',
-    lastSync: '1 hour ago',
-    recordsSynced: 850000,
-    icon: '❄️'
-  },
-  {
-    id: '3',
-    name: 'Staging Snowflake',
-    type: 'snowflake',
-    status: 'error',
-    lastSync: '2 days ago',
-    recordsSynced: 0,
-    icon: '❄️'
-  }
-];
-
 export function IntegrationsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
 
-  const filteredIntegrations = mockIntegrations.filter(integration =>
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ FETCH FROM BACKEND API
+  useEffect(() => {
+    fetch('http://localhost:8000/integration')
+      .then(res => res.json())
+      .then(data => {
+        const formatted: Integration[] = data.map((row: any, index: number) => ({
+          id: String(index + 1),                     // UI requires string id
+          name: row.name,
+          type: 'snowflake',                         // Since all are Snowflake
+          status: 'connected',                       // You can replace later with real heartbeat
+          lastSync: formatTime(row.created_at),
+          recordsSynced: 0,                          // Not provided by API
+          icon: '❄️'
+        }));
+
+        setIntegrations(formatted);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch integrations:', err);
+        setLoading(false);
+      });
+  }, []);
+
+  const filteredIntegrations = integrations.filter(integration =>
     integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     integration.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -60,7 +57,7 @@ export function IntegrationsView() {
             Create Integration
           </Button>
         </div>
-        
+
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -76,13 +73,17 @@ export function IntegrationsView() {
 
       <div className="flex-1 overflow-auto px-8 py-6">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredIntegrations.map(integration => (
-            <IntegrationCard
-              key={integration.id}
-              integration={integration}
-              onClick={() => setSelectedIntegration(integration)}
-            />
-          ))}
+          {loading ? (
+            <p>Loading integrations...</p>
+          ) : (
+            filteredIntegrations.map(integration => (
+              <IntegrationCard
+                key={integration.id}
+                integration={integration}
+                onClick={() => setSelectedIntegration(integration)}
+              />
+            ))
+          )}
         </div>
       </div>
 
@@ -98,4 +99,18 @@ export function IntegrationsView() {
       />
     </div>
   );
+}
+
+// ✅ TIME FORMAT HELPER
+function formatTime(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+
+  if (minutes < 60) return `${minutes} minutes ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hours ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days} days ago`;
 }

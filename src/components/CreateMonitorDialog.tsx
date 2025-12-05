@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,6 +11,20 @@ interface CreateMonitorDialogProps {
 }
 
 export function CreateMonitorDialog({ open, onOpenChange }: CreateMonitorDialogProps) {
+
+  const [formData, setFormData] = useState({
+    name: "",
+    database: "",
+    tableName: "",
+    schedule: "",
+    description: ""
+  });
+
+  const handleCreate = () => {
+    console.log("Form Submitted:", formData);
+    onOpenChange(false);  // close dialog
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -21,18 +36,26 @@ export function CreateMonitorDialog({ open, onOpenChange }: CreateMonitorDialogP
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          
           <div className="grid grid-cols-2 gap-4">
+            
+            {/* Monitor Name */}
             <div className="space-y-2">
               <Label htmlFor="monitor-name">Monitor Name</Label>
-              <Input 
-                id="monitor-name" 
+              <Input
+                id="monitor-name"
                 placeholder="e.g., Customer Data Quality"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
-            
+
+            {/* Database Select */}
             <div className="space-y-2">
               <Label htmlFor="database">Database</Label>
-              <Select>
+              <Select
+                onValueChange={(value: string) => setFormData({ ...formData, database: value })}
+              >
                 <SelectTrigger id="database">
                   <SelectValue placeholder="Select database" />
                 </SelectTrigger>
@@ -46,17 +69,23 @@ export function CreateMonitorDialog({ open, onOpenChange }: CreateMonitorDialogP
             </div>
           </div>
 
+          {/* Table */}
           <div className="space-y-2">
             <Label htmlFor="table">Table Name</Label>
-            <Input 
-              id="table" 
+            <Input
+              id="table"
               placeholder="e.g., customers"
+              value={formData.tableName}
+              onChange={(e) => setFormData({ ...formData, tableName: e.target.value })}
             />
           </div>
 
+          {/* Schedule Select */}
           <div className="space-y-2">
             <Label htmlFor="schedule">Run Schedule</Label>
-            <Select>
+            <Select
+              onValueChange={(value: string) => setFormData({ ...formData, schedule: value })}
+            >
               <SelectTrigger id="schedule">
                 <SelectValue placeholder="Select schedule" />
               </SelectTrigger>
@@ -71,20 +100,25 @@ export function CreateMonitorDialog({ open, onOpenChange }: CreateMonitorDialogP
             </Select>
           </div>
 
+          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description (Optional)</Label>
-            <Input 
-              id="description" 
+            <Input
+              id="description"
               placeholder="Brief description of what this monitor does"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
         </div>
 
+        {/* Buttons */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => onOpenChange(false)}>
+
+          <Button onClick={handleCreate}>
             Create Monitor
           </Button>
         </div>
